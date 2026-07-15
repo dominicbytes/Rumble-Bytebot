@@ -16,7 +16,9 @@ Open `http://127.0.0.1:7474/combined-chat/index.html` and confirm the status rea
 
 ## OBS Browser Source
 
-Add a Browser Source using the same URL. A starting size of 420 by 700 works well. Disable **Shutdown source when not visible** and **Refresh browser when scene becomes active** to preserve the current in-memory rows.
+Add a Browser Source using the same URL. A starting size of 420 by 700 works well. Do not check or Disable **Shutdown source when not visible** and **Refresh browser when scene becomes active** to preserve the current in-memory rows.
+
+You can add the chat as a custom dock by copy-pasting the URL into the custom dock option on OBS. Note that this combined chat will not display events (such as chat point redeems). But it will give you a single place to read chat from all 4 sources.
 
 Rumble chat and rants are populated by Rumble only while the channel is live. Use `[Rumble.Bot] Test` for an offline pipeline check.
 
