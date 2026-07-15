@@ -1,8 +1,8 @@
 # Rumble-Bytebot
 
-Rumble-Bytebot is a Streamer.bot integration for the documented Rumble Live Stream API. It adds normalized Rumble triggers and packages a local combined-chat surface for Twitch, YouTube, Kick, and Rumble.
+Rumble-Bytebot is a Streamer.bot integration for the documented Rumble Live Stream API. It adds normalized Rumble triggers and packages a local combined-chat surface for Twitch, YouTube, Kick, and Rumble. This is based on the improved KickBot integration for StreamerBot.
 
-> Status: private `0.1.0` preview for Streamer.bot 1.0.4 on Windows with .NET Framework 4.8.1.
+> Status: `0.1.0` preview for Streamer.bot 1.0.4 on Windows with .NET Framework 4.8.1.
 
 ## Features
 
@@ -31,6 +31,10 @@ Build instructions are in [docs/BUILDING.md](docs/BUILDING.md). Event names and 
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+## Notes
+
+I vibe coded this in GPT Sol 5.6. I have tested it on my own stream and it works. Use at your own risk.
 
 ## About Dominic Bytes
 
