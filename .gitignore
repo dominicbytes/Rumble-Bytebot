@@ -1,0 +1,26 @@
+# Build and test output
+bin/
+obj/
+TestResults/
+coverage/
+
+# Local dependencies and credentials
+.local/
+*.local.json
+*.secrets.json
+*.tokens.json
+*.log
+*.tmp
+*.cache
+
+# Generated releases
+dist/
+artifacts/
+
+# IDE state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+

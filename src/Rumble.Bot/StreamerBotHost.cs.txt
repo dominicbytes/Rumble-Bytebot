@@ -1,0 +1,13 @@
+using Rumble.Bot;
+
+public class CPHInline
+{
+    public bool Execute() { return true; }
+    public bool Initialize() { RumblePlugin.Initialize(CPH); return true; }
+    public bool Configure() { return RumblePlugin.Configure(CPH, args); }
+    public bool Start() { return RumblePlugin.Start(CPH); }
+    public bool Stop() { return RumblePlugin.Stop(CPH); }
+    public bool Reconnect() { return RumblePlugin.Reconnect(CPH); }
+    public bool Status() { return RumblePlugin.Status(CPH); }
+    public bool Test() { return RumblePlugin.Test(CPH); }
+}

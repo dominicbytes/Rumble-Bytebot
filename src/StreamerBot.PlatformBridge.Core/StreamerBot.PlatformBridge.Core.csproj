@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>StreamerBot.PlatformBridge.Core</AssemblyName>
+    <RootNamespace>StreamerBot.PlatformBridge.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(StreamerBotPath)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Security" />
+  </ItemGroup>
+</Project>

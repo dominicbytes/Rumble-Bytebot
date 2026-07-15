@@ -1,0 +1,25 @@
+:root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; background: #101214; color: #f4f6f8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: transparent; }
+body { background: rgba(16, 18, 20, .96); }
+header { position: sticky; top: 0; z-index: 2; height: 34px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #343a40; background: #181b1f; font-size: 12px; }
+#status { color: #aab2bb; }
+#status.online { color: #59d98e; }
+#status.offline { color: #ff7979; }
+#chat { display: flex; flex-direction: column; }
+.message { display: grid; grid-template-columns: 5px minmax(0, 1fr); gap: 8px; padding: 6px 9px 7px 0; border-bottom: 1px solid rgba(255,255,255,.065); }
+.platform { background: #87909a; }
+.message[data-platform="twitch"] .platform { background: #9147ff; }
+.message[data-platform="youtube"] .platform { background: #ff3b30; }
+.message[data-platform="kick"] .platform { background: #53fc18; }
+.message[data-platform="rumble"] .platform { background: #85c742; }
+.content { min-width: 0; font-size: 13px; line-height: 1.42; overflow-wrap: anywhere; }
+.meta { display: inline-flex; align-items: center; gap: 4px; margin-right: 5px; }
+.badge, .emote { display: inline-block; object-fit: contain; vertical-align: middle; }
+.badge { width: 16px; height: 16px; }
+.badge-label { width: auto; height: auto; padding: 1px 3px; border: 1px solid #59616a; color: #dfe5eb; font-size: 9px; line-height: 12px; text-transform: uppercase; }
+.emote { max-width: 28px; height: 22px; margin: -3px 1px; }
+.name { font-weight: 650; }
+.name::after { content: ":"; color: #aab2bb; }
+.text { white-space: pre-wrap; }
+@media (max-width: 340px) { header { display: none; } .message { padding-top: 5px; padding-bottom: 6px; } .content { font-size: 12px; } }

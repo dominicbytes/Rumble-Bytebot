@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net481</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Authors>Dominic Bytes</Authors>
+    <Copyright>Copyright (c) 2026 Dominic Bytes</Copyright>
+    <RepositoryUrl>https://github.com/dominicbytes/Rumble-Bytebot</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <StreamerBotPath Condition="'$(StreamerBotPath)' == ''">$(MSBuildThisFileDirectory).local\streamerbot</StreamerBotPath>
+  </PropertyGroup>
+</Project>
+
