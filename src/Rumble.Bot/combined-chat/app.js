@@ -74,7 +74,7 @@
   function normalizeAssets(value, allowLabels) {
     if (!Array.isArray(value)) return [];
     return value.map(asset => typeof asset === "string" ? (safeUrl(asset) ? { url: asset } : { label: asset }) : asset)
-      .filter(asset => asset && (safeUrl(asset.url || asset.imageUrl || asset.image) || (allowLabels && (asset.label || asset.name || asset.title))));
+      .filter(asset => asset && (safeUrl(asset.url || asset.imageUrl || asset.ImageUrl || asset.image) || (allowLabels && (asset.label || asset.name || asset.Name || asset.title))));
   }
 
   function append(model) {
@@ -104,17 +104,17 @@
   }
 
   function renderAsset(asset, className) {
-    const url = asset.url || asset.imageUrl || asset.image;
+    const url = asset.url || asset.imageUrl || asset.ImageUrl || asset.image;
     if (!safeUrl(url)) {
       const label = document.createElement("span");
       label.className = "badge badge-label";
-      label.textContent = asset.label || asset.name || asset.title || "badge";
+      label.textContent = asset.label || asset.name || asset.Name || asset.title || "badge";
       return label;
     }
     const img = document.createElement("img");
     img.className = className;
     img.src = url;
-    img.alt = asset.name || asset.title || "";
+    img.alt = asset.name || asset.Name || asset.title || "";
     img.loading = "lazy";
     return img;
   }

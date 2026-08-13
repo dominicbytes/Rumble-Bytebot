@@ -6,6 +6,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Version>0.1.1</Version>
     <Authors>Dominic Bytes</Authors>
     <Copyright>Copyright (c) 2026 Dominic Bytes</Copyright>
     <RepositoryUrl>https://github.com/dominicbytes/Rumble-Bytebot</RepositoryUrl>
@@ -13,4 +14,3 @@
     <StreamerBotPath Condition="'$(StreamerBotPath)' == ''">$(MSBuildThisFileDirectory).local\streamerbot</StreamerBotPath>
   </PropertyGroup>
 </Project>
-

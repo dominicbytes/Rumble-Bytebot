@@ -3,7 +3,7 @@
 ## Requirements
 
 - Windows
-- Streamer.bot 1.0.4
+- Streamer.bot 1.0.7
 - .NET Framework 4.8.1
 - A private Rumble Live Stream API URL
 
@@ -24,4 +24,3 @@ The import initializes custom triggers when Streamer.bot starts. It does not aut
 ## Files created at runtime
 
 Configuration and deduplication state are stored outside the plugin folder under the current Windows user's local application data. The API URL is protected with CurrentUser DPAPI. Do not move those files into the repository.
-

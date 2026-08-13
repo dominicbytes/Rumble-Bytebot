@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$StreamerBotPath,
-    [string]$Version = "0.1.0",
+    [string]$Version = "0.1.1",
     [string]$DotNetPath = ""
 )
 
@@ -26,7 +26,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $StreamerBotPath "Streamer.bot.Plugi
 if ($LASTEXITCODE -ne 0) { throw "Restore failed." }
 & $dotnet test $solution --configuration Release --no-restore -p:StreamerBotPath="$StreamerBotPath"
 if ($LASTEXITCODE -ne 0) { throw "Build or tests failed." }
-& $dotnet run --project (Join-Path $root "tools\BundleBuilder\BundleBuilder.csproj") --configuration Release --no-restore
+& $dotnet run --project (Join-Path $root "tools\BundleBuilder\BundleBuilder.csproj") --configuration Release --no-restore -- $Version
 if ($LASTEXITCODE -ne 0) { throw "Bundle generation failed." }
 
 New-Item -ItemType Directory -Force -Path $artifacts | Out-Null

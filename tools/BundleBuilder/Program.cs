@@ -5,6 +5,7 @@ using System.Text.Json;
 
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 var dist = Path.Combine(root, "dist");
+var version = args.Length > 0 ? args[0] : "0.1.1";
 
 BuildPackage(new Package(
     "Rumble.Bot",
@@ -47,10 +48,10 @@ void BuildPackage(Package package)
 
     var bundle = new
     {
-        meta = new { name = package.Name, author = "Dominic Bytes", version = "0.1.0", description = package.Description, autoRunAction = (string?)null, minimumVersion = (string?)null },
+        meta = new { name = package.Name, author = "Dominic Bytes", version, description = package.Description, autoRunAction = (string?)null, minimumVersion = (string?)null },
         data = new { actions, queues = Array.Empty<object>(), commands = Array.Empty<object>(), websocketServers = Array.Empty<object>(), websocketClients = Array.Empty<object>(), timers = Array.Empty<object>() },
         version = 23,
-        exportedFrom = "1.0.4",
+        exportedFrom = "1.0.7",
         minimumVersion = "1.0.0-alpha.1"
     };
 

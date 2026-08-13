@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Combined Chat Smoke Test</title>
+  <link rel="stylesheet" href="../src/Rumble.Bot/combined-chat/styles.css">
+</head>
+<body>
+  <header><strong>Combined Chat</strong><span id="status" aria-live="polite">Connecting</span></header>
+  <main id="chat" aria-live="polite"></main>
+  <script>
+    class MockWebSocket {
+      constructor() {
+        this.listeners = {};
+        window.setTimeout(() => this.emit("open", {}), 0);
+      }
+
+      addEventListener(name, callback) {
+        (this.listeners[name] ||= []).push(callback);
+      }
+
+      send() {
+        const events = [
+          { event: { source: "Twitch", type: "ChatMessage" }, data: { user: { name: "Twitch Viewer", badges: [{ name: "broadcaster", imageUrl: "https://example.test/badge.png" }] }, text: "Hello from Twitch", emotes: [{ Name: "Kappa", ImageUrl: "https://example.test/kappa.png" }] } },
+          { event: { source: "YouTube", type: "Message" }, data: { displayName: "YouTube Viewer", message: "Hello from YouTube" } },
+          { event: { source: "Kick", type: "ChatMessage" }, data: { userName: "Kick Viewer", message: "Hello from Kick" } },
+          { event: { source: "Custom", type: "CodeEvent" }, data: { eventName: "bridge.rumble.chat_message", args: { userName: "Rumble Viewer", message: "<img src=x onerror=alert(1)>", badgesJson: "[\"subscriber\"]" } } }
+        ];
+        events.forEach((data, index) => window.setTimeout(() => this.emit("message", { data: JSON.stringify(data) }), index + 1));
+      }
+
+      close() {}
+
+      emit(name, event) {
+        (this.listeners[name] || []).forEach(callback => callback(event));
+      }
+    }
+
+    window.WebSocket = MockWebSocket;
+  </script>
+  <script src="../src/Rumble.Bot/combined-chat/app.js"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 Rumble-Bytebot is a Streamer.bot integration for the documented Rumble Live Stream API. It adds normalized Rumble triggers and packages a local combined-chat surface for Twitch, YouTube, Kick, and Rumble. This is based on the improved KickBot integration for StreamerBot.
 
-> Status: `0.1.0` preview for Streamer.bot 1.0.4 on Windows with .NET Framework 4.8.1.
+> Status: `0.1.1` preview, tested with Streamer.bot 1.0.7 on Windows and .NET Framework 4.8.1.
 
 ## Features
 
@@ -18,7 +18,7 @@ Rumble support is read-only. The documented API does not provide outbound chat, 
 
 ## Install
 
-Download `Rumble-Bytebot-v0.1.0.zip` from the repository's Releases page and follow [the installation guide](docs/INSTALLATION.md). Combined-chat setup is covered in [the overlay guide](docs/COMBINED-CHAT.md).
+Download `Rumble-Bytebot-v0.1.1.zip` from the repository's Releases page and follow [the installation guide](docs/INSTALLATION.md). Combined-chat setup is covered in [the overlay guide](docs/COMBINED-CHAT.md).
 
 ## Security
 
