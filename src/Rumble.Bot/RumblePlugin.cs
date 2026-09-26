@@ -124,6 +124,35 @@ public static class RumblePlugin
         return true;
     }
 
+    public static bool OverlayEvent(IInlineInvokeProxy proxy, IDictionary<string, object> arguments)
+    {
+        var platform = GetString(arguments, "platform").Trim().ToLowerInvariant();
+        var message = GetString(arguments, "message");
+        if (platform != "twitch" && platform != "youtube" && platform != "kick" && platform != "rumble")
+        {
+            proxy.LogError("[Rumble.Bot] Overlay Event requires platform=twitch, youtube, kick, or rumble.");
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            proxy.LogError("[Rumble.Bot] Overlay Event requires a message argument.");
+            return false;
+        }
+
+        var eventType = GetString(arguments, "eventType");
+        proxy.TriggerCodeEvent(RumbleEventNames.OverlayEvent, new Dictionary<string, object>
+        {
+            ["platform"] = platform,
+            ["eventType"] = string.IsNullOrWhiteSpace(eventType) ? "custom" : eventType,
+            ["userName"] = GetEventUser(arguments),
+            ["displayName"] = GetEventUser(arguments),
+            ["message"] = message,
+            ["createdAt"] = DateTimeOffset.UtcNow.ToString("O"),
+            ["rawJson"] = "{}"
+        });
+        return true;
+    }
+
     private static RumbleRuntime EnsureRuntime(IInlineInvokeProxy proxy)
     {
         lock (Sync)
@@ -143,6 +172,12 @@ public static class RumblePlugin
     }
 
     private static string GetString(IDictionary<string, object> arguments, string key) => arguments.TryGetValue(key, out var value) ? Convert.ToString(value) ?? string.Empty : string.Empty;
+    private static string GetEventUser(IDictionary<string, object> arguments)
+    {
+        foreach (var key in new[] { "displayName", "userName", "user", "userLogin", "username", "user_name" })
+            if (arguments.TryGetValue(key, out var value) && value is string name && !string.IsNullOrWhiteSpace(name)) return name;
+        return string.Empty;
+    }
     private static int? GetInt(IDictionary<string, object> arguments, string key) => arguments.TryGetValue(key, out var value) && int.TryParse(Convert.ToString(value), out var result) ? result : (int?)null;
 
     private static bool TryShowConfiguration(string currentUrl, int currentInterval, out string apiUrl, out int interval)

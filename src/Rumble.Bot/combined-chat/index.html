@@ -4,11 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Streamer.bot Combined Chat</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header><strong>Combined Chat</strong><span id="status" aria-live="polite">Connecting</span></header>
+  <details><summary>Platforms</summary><div id="platforms"></div></details>
+  <div class="chat-controls"><button id="clear-chat" type="button" disabled>Clear chat</button><span id="control-status" aria-live="polite">Connecting shared controls</span></div>
   <main id="chat" aria-live="polite"></main>
-  <script src="app.js"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

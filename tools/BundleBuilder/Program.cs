@@ -11,7 +11,7 @@ BuildPackage(new Package(
     "Rumble.Bot",
     "Streamer.bot integration for the documented Rumble Live Stream API.",
     Path.Combine(root, "src", "Rumble.Bot", "StreamerBotHost.cs.txt"),
-    new[] { "Initialize", "Configure", "Start", "Stop", "Reconnect", "Status", "Test" },
+    new[] { "Initialize", "Configure", "Start", "Stop", "Reconnect", "Status", "Test", "Overlay Event" },
     new[] { "StreamerBot.PlatformBridge.Core.dll", "Rumble.Bot.dll" }));
 
 void BuildPackage(Package package)
@@ -40,6 +40,8 @@ void BuildPackage(Package package)
     var hostCode = File.ReadAllText(package.HostSource, Encoding.UTF8);
     var codeId = StableGuid(package.Name + ":host-code");
     var actions = new List<object> { HostAction(package, hostCode, codeId) };
+    var shared = new Package("Combined Chat", "Shared display controls for all OBS chat views.", "", Array.Empty<string>(), new[] { "StreamerBot.PlatformBridge.Core.dll" });
+    actions.Add(HostAction(shared, File.ReadAllText(Path.Combine(root, "tools", "BundleBuilder", "SharedChatHost.cs.txt")), StableGuid("Combined Chat:host-code"), "Controls"));
     foreach (var methodLabel in package.Methods)
     {
         var method = methodLabel.Replace(" ", string.Empty, StringComparison.Ordinal);
@@ -65,9 +67,9 @@ void BuildPackage(Package package)
     File.WriteAllText(Path.Combine(packageDirectory, package.Name + ".sb"), Convert.ToBase64String(payload.ToArray()), new UTF8Encoding(false));
 }
 
-object HostAction(Package package, string code, string codeId) => Action(
+object HostAction(Package package, string code, string codeId, string label = "Host (do not run)") => Action(
     package,
-    "Host (do not run)",
+    label,
     Array.Empty<object>(),
     new object[]
     {
@@ -76,12 +78,8 @@ object HostAction(Package package, string code, string codeId) => Action(
         {
             name = package.Name + " Host",
             description = package.Description,
-            references = new[]
-            {
-                @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll",
-                @".\dlls\StreamerBot.PlatformBridge.Core.dll",
-                @".\dlls\" + package.Name + ".dll"
-            },
+            references = new[] { @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll" }
+                .Concat(package.Dlls.Select(dll => @".\dlls\" + dll)).ToArray(),
             byteCode = Convert.ToBase64String(Encoding.UTF8.GetBytes(code)),
             precompile = true,
             delayStart = false,

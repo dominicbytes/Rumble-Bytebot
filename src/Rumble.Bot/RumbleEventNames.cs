@@ -8,6 +8,7 @@ public static class RumbleEventNames
     public const string Subscription = "bridge.rumble.subscription";
     public const string GiftedSubscription = "bridge.rumble.gifted_sub";
     public const string StreamStatus = "bridge.rumble.stream_status";
+    public const string OverlayEvent = "bridge.overlay.event";
 
     public static readonly string[] All =
     {
@@ -16,6 +17,7 @@ public static class RumbleEventNames
         Follow,
         Subscription,
         GiftedSubscription,
-        StreamStatus
+        StreamStatus,
+        OverlayEvent
     };
 }

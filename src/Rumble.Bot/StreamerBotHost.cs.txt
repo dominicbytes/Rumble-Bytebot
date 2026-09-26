@@ -10,4 +10,5 @@ public class CPHInline
     public bool Reconnect() { return RumblePlugin.Reconnect(CPH); }
     public bool Status() { return RumblePlugin.Status(CPH); }
     public bool Test() { return RumblePlugin.Test(CPH); }
+    public bool OverlayEvent() { return RumblePlugin.OverlayEvent(CPH, args); }
 }

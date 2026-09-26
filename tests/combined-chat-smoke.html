@@ -9,9 +9,11 @@
   <header><strong>Combined Chat</strong><span id="status" aria-live="polite">Connecting</span></header>
   <main id="chat" aria-live="polite"></main>
   <script>
+    localStorage.removeItem("rumble-bytebot-combined-chat-v2");
     class MockWebSocket {
       constructor() {
         this.listeners = {};
+        this.readyState = MockWebSocket.CONNECTING;
         window.setTimeout(() => this.emit("open", {}), 0);
       }
 
@@ -21,20 +23,32 @@
 
       send() {
         const events = [
-          { event: { source: "Twitch", type: "ChatMessage" }, data: { user: { name: "Twitch Viewer", badges: [{ name: "broadcaster", imageUrl: "https://example.test/badge.png" }] }, text: "Hello from Twitch", emotes: [{ Name: "Kappa", ImageUrl: "https://example.test/kappa.png" }] } },
+          { event: { source: "Twitch", type: "ChatMessage" }, data: { messageId: "twitch-chat", createdAt: new Date().toISOString(), user: { name: "Twitch Viewer", badges: [{ name: "broadcaster", imageUrl: "https://example.test/badge.png" }] }, text: "Hello Kappa", emotes: [{ Name: "Kappa", StartIndex: 6, EndIndex: 10, ImageUrl: "https://example.test/kappa.png" }] } },
+          { event: { source: "Twitch", type: "RewardRedemption" }, data: { id: "twitch-reward", createdAt: new Date().toISOString(), user: { name: "Twitch Viewer" }, reward: { title: "Hydrate" } } },
           { event: { source: "YouTube", type: "Message" }, data: { displayName: "YouTube Viewer", message: "Hello from YouTube" } },
           { event: { source: "Kick", type: "ChatMessage" }, data: { userName: "Kick Viewer", message: "Hello from Kick" } },
-          { event: { source: "Custom", type: "CodeEvent" }, data: { eventName: "bridge.rumble.chat_message", args: { userName: "Rumble Viewer", message: "<img src=x onerror=alert(1)>", badgesJson: "[\"subscriber\"]" } } }
+          { event: { source: "Custom", type: "CodeEvent" }, data: { eventName: "bridge.rumble.chat_message", args: { userName: "Rumble Viewer", message: "<img src=x onerror=alert(1)>", badgesJson: "[\"subscriber\"]" } } },
+          { event: { source: "Custom", type: "CodeEvent" }, data: { eventName: "bridge.rumble.rant", args: { eventId: "rumble-rant", userName: "Rumble Supporter", message: "Great stream", amountDollars: 5 } } },
+          { event: { source: "Custom", type: "CodeEvent" }, data: { eventName: "bridge.overlay.event", args: { eventId: "custom-event", platform: "kick", userName: "Custom Action", message: "Milestone reached" } } }
         ];
         events.forEach((data, index) => window.setTimeout(() => this.emit("message", { data: JSON.stringify(data) }), index + 1));
       }
 
-      close() {}
+      close() {
+        this.readyState = MockWebSocket.CLOSED;
+        this.emit("close", {});
+      }
 
       emit(name, event) {
+        if (name === "open") this.readyState = MockWebSocket.OPEN;
         (this.listeners[name] || []).forEach(callback => callback(event));
       }
     }
+
+    MockWebSocket.CONNECTING = 0;
+    MockWebSocket.OPEN = 1;
+    MockWebSocket.CLOSING = 2;
+    MockWebSocket.CLOSED = 3;
 
     window.WebSocket = MockWebSocket;
   </script>

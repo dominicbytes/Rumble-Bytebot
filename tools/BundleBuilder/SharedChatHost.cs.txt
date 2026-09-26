@@ -1,0 +1,13 @@
+using StreamerBot.PlatformBridge.Core;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string message = SharedChatState.Apply(args,
+            () => CPH.GetGlobalVar<string>("bytebot.sharedChat.controls.v1", true),
+            value => CPH.SetGlobalVar("bytebot.sharedChat.controls.v1", value, true));
+        CPH.WebsocketBroadcastJson(message);
+        return true;
+    }
+}
