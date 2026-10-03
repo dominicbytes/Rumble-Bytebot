@@ -202,6 +202,7 @@
       return;
     }
     if (String(name || "").startsWith("bridge.joystick.")) {
+      if (args.streamEventType === "ViewerCountUpdated") return;
       const type = String(name).slice("bridge.joystick.".length);
       const user = eventUser(args);
       let text = `${user}: ${humanize(args.streamEventType || type)}`;
@@ -499,6 +500,9 @@
   }
 
   function suppressed(model) {
+    if (model.platform === "joystick" && model.kind === "event" && model.eventType === "bridge.joystick.stream_event") {
+      return /^.+: Viewer Count Updated$/.test(model.text);
+    }
     return model.platform === "rumble" && model.kind === "event" &&
       (model.eventType === "stream_status" || /^Rumble stream (?:is live|is offline|started|ended)/.test(model.text));
   }
