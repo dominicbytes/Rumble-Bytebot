@@ -187,3 +187,62 @@ for (const [index, [type, data, expected]] of nameCases.entries()) {
   assert.equal(saved.eventType, type);
 }
 console.log('Event username regression tests passed.');
+
+storage.clear();
+const historyKey = 'bytebot-combined-chat-v3:ws://127.0.0.1:8080/';
+storage.set('bytebot-platforms-v1:ws://127.0.0.1:8080/', JSON.stringify(['joystick', 'rumble']));
+const joystickPage = createPage();
+joystickPage.sockets[0].open();
+function joystickEvent(name, args) {
+  joystickPage.sockets[0].message({
+    event: { source: 'Custom', type: 'CodeEvent' },
+    data: { eventName: `bridge.joystick.${name}`, arguments: args }
+  });
+}
+
+// Reproduce the generic event whose saved OBS notice was "Someone: Viewer Count Updated".
+for (let index = 0; index < 100; index++) {
+  joystickEvent('stream_event', { streamEventType: 'ViewerCountUpdated', eventId: `viewer-count-${index}` });
+}
+assert.equal(joystickPage.chat.children.length, 0, 'Viewer-count updates must not create chat rows');
+assert.equal(JSON.parse(storage.get(historyKey) || '[]').length, 0, 'Viewer-count updates must not fill history');
+
+const joystickCases = [
+  ['chat_message', { userName: 'Chatter', message: 'Someone: Viewer Count Updated', messageId: 'chat-viewer-count' }, 'Someone: Viewer Count Updated'],
+  ['tipped', { userName: 'Tipper', amountTokens: 20, tipMenuItem: 'Dance', eventId: 'tip' }, 'Tipper tipped 20 tokens — Dance'],
+  ['wheel_spin_claimed', { userName: 'Spinner', amountTokens: 10, prize: 'Hydrate', eventId: 'wheel' }, 'Spinner claimed a wheel spin (10 tokens) — Hydrate'],
+  ['subscribed', { userName: 'Subscriber', eventId: 'sub' }, 'Subscriber subscribed'],
+  ['followed', { userName: 'Follower', eventId: 'follow' }, 'Follower followed'],
+  ['drop_in', { userName: 'Raider', viewerCount: 7, eventId: 'drop-in' }, 'Raider dropped in with 7 viewers'],
+  ['stream_event', { streamEventType: 'OtherEvent', userName: 'Viewer', eventId: 'other' }, 'Viewer: Other Event']
+];
+for (const [index, [name, args, expected]] of joystickCases.entries()) {
+  joystickEvent(name, args);
+  assert.equal(joystickPage.chat.children.length, index + 1, `${name} should still display`);
+  const row = joystickPage.chat.children.at(-1);
+  assert.equal(row.hidden, false);
+  const saved = JSON.parse(storage.get(historyKey)).at(-1);
+  assert.equal(saved.text, expected);
+}
+joystickPage.sockets[0].message({
+  event: { source: 'Custom', type: 'CodeEvent' },
+  data: { eventName: 'bridge.rumble.stream_status', arguments: { isLive: true } }
+});
+assert.equal(joystickPage.chat.children.length, joystickCases.length, 'Rumble status filtering must remain intact');
+
+const savedJoystickRows = JSON.parse(storage.get(historyKey));
+const cachedCountNotice = {
+  kind: 'event', platform: 'joystick', eventType: 'bridge.joystick.stream_event',
+  text: 'Someone: Viewer Count Updated', parts: [{ type: 'text', text: 'Someone: Viewer Count Updated' }],
+  badges: [], createdAt: new Date().toISOString(), id: 'cached-viewer-count'
+};
+storage.set(historyKey, JSON.stringify([cachedCountNotice, ...savedJoystickRows]));
+const joystickRestoredPage = createPage();
+assert.equal(joystickRestoredPage.chat.children.length, joystickCases.length, 'Cached viewer-count notices must not reappear');
+joystickRestoredPage.sockets[0].open();
+joystickRestoredPage.sockets[0].message({
+  event: { source: 'Custom', type: 'CodeEvent' },
+  data: { eventName: 'bridge.joystick.followed', arguments: { userName: 'NewFollower', eventId: 'new-follow' } }
+});
+assert.equal(JSON.parse(storage.get(historyKey)).length, joystickCases.length + 1, 'Saved history must exclude cached count notices');
+console.log('Joystick viewer-count filtering regression tests passed.');
