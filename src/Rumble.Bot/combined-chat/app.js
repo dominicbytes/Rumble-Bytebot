@@ -500,6 +500,8 @@
   }
 
   function suppressed(model) {
+    if (model.platform === "joystick" && model.kind === "event" &&
+      (model.eventType === "bridge.joystick.user_entered" || model.eventType === "bridge.joystick.user_left")) return true;
     if (model.platform === "joystick" && model.kind === "event" && model.eventType === "bridge.joystick.stream_event") {
       return /^.+: Viewer Count Updated$/.test(model.text);
     }

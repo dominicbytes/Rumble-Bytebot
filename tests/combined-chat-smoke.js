@@ -246,3 +246,44 @@ joystickRestoredPage.sockets[0].message({
 });
 assert.equal(JSON.parse(storage.get(historyKey)).length, joystickCases.length + 1, 'Saved history must exclude cached count notices');
 console.log('Joystick viewer-count filtering regression tests passed.');
+
+storage.clear();
+storage.set('bytebot-platforms-v1:ws://127.0.0.1:8080/', JSON.stringify(['joystick']));
+const presencePage = createPage();
+presencePage.sockets[0].open();
+for (const [index, name] of ['user_entered', 'user_left'].entries()) {
+  for (const payload of [
+    { eventName: `bridge.joystick.${name}`, arguments: { userName: 'PresenceViewer', eventId: `presence-arguments-${index}` } },
+    { name: `bridge.joystick.${name}`, args: { userName: 'PresenceViewer', eventId: `presence-args-${index}` } }
+  ]) {
+    presencePage.sockets[0].message({ event: { source: 'Custom', type: 'CodeEvent' }, data: payload });
+  }
+}
+assert.equal(presencePage.chat.children.length, 0, 'Presence events must not create chat rows');
+assert.equal(JSON.parse(storage.get(historyKey) || '[]').length, 0, 'Presence events must not fill history');
+
+for (const [index, message] of ['User entered', 'User left'].entries()) {
+  presencePage.sockets[0].message({
+    event: { source: 'Custom', type: 'CodeEvent' },
+    data: { eventName: 'bridge.joystick.chat_message', arguments: { userName: 'Chatter', message, messageId: `presence-text-${index}` } }
+  });
+}
+assert.equal(presencePage.chat.children.length, 2, 'Actual chat mentioning presence must remain visible');
+const savedChatRows = JSON.parse(storage.get(historyKey));
+const cachedPresenceRows = ['user_entered', 'user_left'].map((type, index) => ({
+  kind: 'event', platform: 'joystick', eventType: `bridge.joystick.${type}`,
+  text: `PresenceViewer: User ${index ? 'left' : 'entered'}`,
+  parts: [{ type: 'text', text: `PresenceViewer: User ${index ? 'left' : 'entered'}` }],
+  badges: [], createdAt: new Date().toISOString(), id: `cached-presence-${index}`
+}));
+storage.set(historyKey, JSON.stringify([...cachedPresenceRows, ...savedChatRows]));
+const presenceRestoredPage = createPage();
+assert.equal(presenceRestoredPage.chat.children.length, 2, 'Cached presence notices must not reappear');
+presenceRestoredPage.sockets[0].open();
+presenceRestoredPage.sockets[0].message({
+  event: { source: 'Custom', type: 'CodeEvent' },
+  data: { eventName: 'bridge.joystick.followed', args: { userName: 'StillVisible', eventId: 'presence-follow' } }
+});
+assert.equal(presenceRestoredPage.chat.children.length, 3, 'Follow events must remain visible');
+assert.equal(JSON.parse(storage.get(historyKey)).length, 3, 'Saved history must exclude cached presence notices');
+console.log('Joystick presence filtering regression tests passed.');
