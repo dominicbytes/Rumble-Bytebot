@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$StreamerBotPath,
-    [string]$Version = "0.1.1",
+    [string]$Version = "0.1.2-local.3",
     [string]$DotNetPath = ""
 )
 

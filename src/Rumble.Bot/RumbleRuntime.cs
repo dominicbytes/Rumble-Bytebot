@@ -11,22 +11,37 @@ namespace Rumble.Bot;
 public sealed class RumbleRuntime : IDisposable
 {
     private const int FingerprintCapacity = 250;
+    private const int MaximumBackoffSeconds = 60;
     private readonly object sync = new object();
+    private readonly object stateSync = new object();
     private readonly IEventDispatcher dispatcher;
     private readonly IPluginLogger logger;
     private readonly JsonFileStore<RumbleDedupeState> stateStore;
+    private readonly Func<Uri, CancellationToken, Task<string>> fetch;
+    private readonly Func<TimeSpan, CancellationToken, Task> delay;
     private CancellationTokenSource? cancellation;
     private Task? worker;
+    private Dictionary<string, FingerprintSet>? sets;
+    private bool baselineEstablished;
+    private bool unsavedChanges;
     private string lastStreamStatusFingerprint = string.Empty;
     private string lastPollError = string.Empty;
     private string pollStatus = "NotRun";
     private DateTimeOffset? lastPollAt;
 
     public RumbleRuntime(IEventDispatcher dispatcher, IPluginLogger logger, string statePath)
+        : this(dispatcher, logger, statePath, (uri, token) => Task.Run(() => DownloadWithWinHttp(uri), token), Task.Delay)
+    {
+    }
+
+    internal RumbleRuntime(IEventDispatcher dispatcher, IPluginLogger logger, string statePath,
+        Func<Uri, CancellationToken, Task<string>> fetch, Func<TimeSpan, CancellationToken, Task> delay)
     {
         this.dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         stateStore = new JsonFileStore<RumbleDedupeState>(statePath);
+        this.fetch = fetch ?? throw new ArgumentNullException(nameof(fetch));
+        this.delay = delay ?? throw new ArgumentNullException(nameof(delay));
     }
 
     public bool IsRunning
@@ -35,7 +50,7 @@ public sealed class RumbleRuntime : IDisposable
         {
             lock (sync)
             {
-                return worker != null && !worker.IsCompleted;
+                return cancellation != null && worker != null && !worker.IsCompleted;
             }
         }
     }
@@ -59,13 +74,15 @@ public sealed class RumbleRuntime : IDisposable
 
         lock (sync)
         {
-            if (worker != null && !worker.IsCompleted)
+            if (cancellation != null && worker != null && !worker.IsCompleted)
             {
                 return;
             }
 
+            // A stopped worker may still be inside a WinHTTP request, so the new worker waits for it.
+            var previous = worker;
             cancellation = new CancellationTokenSource();
-            worker = RunAsync(uri, Math.Max(2, config.PollIntervalSeconds), cancellation.Token);
+            worker = RunAfterAsync(previous, uri, Math.Max(2, config.PollIntervalSeconds), cancellation.Token);
         }
 
         logger.Info("Rumble polling started.");
@@ -78,67 +95,94 @@ public sealed class RumbleRuntime : IDisposable
         {
             source = cancellation;
             cancellation = null;
-            worker = null;
         }
 
+        // Not disposed: the worker may still observe its token, and a plain source owns no unmanaged resources.
         source?.Cancel();
-        source?.Dispose();
         logger.Info("Rumble polling stopped.");
     }
 
     public async Task PollOnceAsync(Uri apiUri, CancellationToken cancellationToken)
     {
-        var json = await Task.Run(() => DownloadWithWinHttp(apiUri), cancellationToken).ConfigureAwait(false);
+        var json = await fetch(apiUri, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var result = RumbleParser.Parse(json);
         Process(result);
     }
 
     public void Process(RumblePollResult result)
     {
-        var stateExists = stateStore.TryLoad(out var state);
-        var sets = CreateSets(state);
-        var firstPoll = !stateExists || !state.BaselineEstablished;
-
-        foreach (var observation in result.Observations)
+        lock (stateSync)
         {
-            if (!sets.TryGetValue(observation.Collection, out var set))
+            if (sets == null)
             {
-                set = new FingerprintSet(FingerprintCapacity);
-                sets[observation.Collection] = set;
+                var stateExists = stateStore.TryLoad(out var state);
+                sets = CreateSets(state);
+                baselineEstablished = stateExists && state.BaselineEstablished;
             }
 
-            if (set.Add(observation.Fingerprint) && !firstPoll)
+            var firstPoll = !baselineEstablished;
+            foreach (var observation in result.Observations)
             {
-                dispatcher.Dispatch(observation.PlatformEvent);
+                if (!sets.TryGetValue(observation.Collection, out var set))
+                {
+                    set = new FingerprintSet(FingerprintCapacity);
+                    sets[observation.Collection] = set;
+                }
+
+                if (set.Add(observation.Fingerprint))
+                {
+                    unsavedChanges = true;
+                    if (!firstPoll)
+                    {
+                        dispatcher.Dispatch(observation.PlatformEvent);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(result.StreamStatusFingerprint))
+            {
+                if (!firstPoll && result.StreamStatus != null && result.StreamStatusFingerprint != lastStreamStatusFingerprint)
+                {
+                    dispatcher.Dispatch(result.StreamStatus);
+                }
+                lastStreamStatusFingerprint = result.StreamStatusFingerprint;
+            }
+
+            if (firstPoll || unsavedChanges)
+            {
+                stateStore.Save(new RumbleDedupeState { BaselineEstablished = true, Collections = Snapshot(sets) });
+                baselineEstablished = true;
+                unsavedChanges = false;
+            }
+
+            if (firstPoll)
+            {
+                logger.Info("Rumble baseline established; existing API items were not dispatched.");
             }
         }
+    }
 
-        if (!string.IsNullOrEmpty(result.StreamStatusFingerprint))
+    private async Task RunAfterAsync(Task? previous, Uri apiUri, int intervalSeconds, CancellationToken cancellationToken)
+    {
+        if (previous != null)
         {
-            if (!firstPoll && result.StreamStatus != null && result.StreamStatusFingerprint != lastStreamStatusFingerprint)
-            {
-                dispatcher.Dispatch(result.StreamStatus);
-            }
-            lastStreamStatusFingerprint = result.StreamStatusFingerprint;
+            try { await previous.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
         }
 
-        state.BaselineEstablished = true;
-        state.Collections = Snapshot(sets);
-        stateStore.Save(state);
-
-        if (firstPoll)
-        {
-            logger.Info("Rumble baseline established; existing API items were not dispatched.");
-        }
+        await RunAsync(apiUri, intervalSeconds, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RunAsync(Uri apiUri, int intervalSeconds, CancellationToken cancellationToken)
     {
+        var consecutiveFailures = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
                 await PollOnceAsync(apiUri, cancellationToken).ConfigureAwait(false);
+                consecutiveFailures = 0;
                 lock (sync)
                 {
                     pollStatus = "Succeeded";
@@ -156,20 +200,53 @@ public sealed class RumbleRuntime : IDisposable
             }
             catch (Exception exception)
             {
+                consecutiveFailures++;
                 lock (sync)
                 {
                     pollStatus = "Failed";
                     lastPollAt = DateTimeOffset.UtcNow;
                 }
-                if (!string.Equals(lastPollError, exception.Message, StringComparison.Ordinal))
+                var message = DescribeFailure(exception, apiUri);
+                if (!string.Equals(lastPollError, message, StringComparison.Ordinal))
                 {
-                    logger.Error("Rumble poll failed: " + exception.Message);
-                    lastPollError = exception.Message;
+                    logger.Error("Rumble poll failed: " + message);
+                    lastPollError = message;
                 }
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await delay(PollDelay(intervalSeconds, consecutiveFailures), cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
+    }
+
+    private static TimeSpan PollDelay(int intervalSeconds, int consecutiveFailures)
+    {
+        if (consecutiveFailures == 0)
+        {
+            return TimeSpan.FromSeconds(intervalSeconds);
+        }
+
+        var ceiling = Math.Max(intervalSeconds, MaximumBackoffSeconds);
+        return TimeSpan.FromSeconds(Math.Min(ceiling, intervalSeconds * Math.Pow(2, Math.Min(consecutiveFailures, 16))));
+    }
+
+    private static string DescribeFailure(Exception exception, Uri apiUri)
+    {
+        // Late-bound WinHTTP calls wrap the real COM error in TargetInvocationException.
+        while (exception is TargetInvocationException && exception.InnerException != null)
+        {
+            exception = exception.InnerException;
+        }
+
+        return exception.Message.Trim()
+            .Replace(apiUri.OriginalString, "<redacted>")
+            .Replace(apiUri.AbsoluteUri, "<redacted>");
     }
 
     private static Dictionary<string, FingerprintSet> CreateSets(RumbleDedupeState state)

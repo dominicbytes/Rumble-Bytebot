@@ -12,7 +12,7 @@ Rumble-Bytebot is a Streamer.bot integration for the documented Rumble Live Stre
 - Restart-safe deduplication with silent first-poll baselining
 - DPAPI protection for the private Rumble API URL
 - Streamer.bot actions for Configure, Start, Stop, Reconnect, Status, and Test
-- Local Twitch, YouTube, Kick, and Rumble combined-chat page for OBS
+- Standard Bytebot combined-chat page for OBS (Twitch, YouTube, Kick, Rumble, AltStream, optional Joystick.TV); install only one copy across all Bytebot plugins
 
 Rumble support is read-only. The documented API does not provide outbound chat, moderation, raids, or conventional reward-redemption endpoints.
 

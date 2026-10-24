@@ -55,7 +55,7 @@ public sealed class RumbleTests : IDisposable
         if (Directory.Exists(directory)) Directory.Delete(directory, true);
     }
 
-    private static string Payload(string chatText) => "{" +
+    internal static string Payload(string chatText) => "{" +
         "\"followers\":{\"recent_followers\":[{\"username\":\"follower\",\"followed_on\":\"2026-01-01T00:00:00Z\"}]}," +
         "\"subscribers\":{\"recent_subscribers\":[]},\"gifted_subs\":{\"recent_gifted_subs\":[]}," +
         "\"livestreams\":[{\"id\":\"stream-1\",\"title\":\"Live\",\"is_live\":true,\"watching_now\":3,\"likes\":2,\"dislikes\":0,\"stream_key\":\"must-not-leak\"," +
@@ -76,9 +76,10 @@ internal static class ObservationExtensions
 internal sealed class RecordingAdapter : IEventDispatcher, IPluginLogger
 {
     public List<PlatformEvent> Events { get; } = new List<PlatformEvent>();
-    public void Dispatch(PlatformEvent platformEvent) => Events.Add(platformEvent);
+    public List<string> Errors { get; } = new List<string>();
+    public void Dispatch(PlatformEvent platformEvent) { lock (Events) Events.Add(platformEvent); }
     public void Debug(string message) { }
     public void Info(string message) { }
     public void Warn(string message) { }
-    public void Error(string message) { }
+    public void Error(string message) { lock (Errors) Errors.Add(message); }
 }
