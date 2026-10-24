@@ -19,6 +19,12 @@
 8. Run `[Rumble.Bot] Status` and confirm `Configured=True`, `Running=True`, and `PollStatus=Succeeded`.
 9. Run `[Rumble.Bot] Test` to emit a synthetic chat event.
 
+## Combined chat
+
+Install ONLY ONE combined chat. Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot ship the same `combined-chat` folder. Keep a single folder, replace its contents only when this package's chat version (2026.10.22) is newer, and never map a second copy. Keep one `StreamerBot.PlatformBridge.Core.dll`; every package ships the same file. See [COMBINED-CHAT.md](COMBINED-CHAT.md).
+
+## Startup
+
 The import initializes custom triggers when Streamer.bot starts. It does not automatically configure or start polling.
 
 ## Files created at runtime

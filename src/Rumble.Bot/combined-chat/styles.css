@@ -29,3 +29,6 @@ summary { cursor: pointer; }
 .stream-event { background: rgba(255,255,255,.035); }
 .event-text { color: #e7ebef; font-style: italic; white-space: pre-wrap; }
 @media (max-width: 340px) { .message { padding-top: 5px; padding-bottom: 6px; font-size: 12px; } .content { font-size: 12px; } }
+.paid-event { border-left: 3px solid #f5c542; background: rgba(245, 197, 66, .12); }
+.paid-event .event-text { font-style: normal; font-weight: 600; color: #ffe08a; }
+#jump-latest { position: fixed; left: 50%; bottom: 10px; z-index: 3; transform: translateX(-50%); padding: 4px 12px; border: 1px solid #59616a; border-radius: 12px; background: #181b1f; color: #f4f6f8; font-size: 12px; cursor: pointer; }

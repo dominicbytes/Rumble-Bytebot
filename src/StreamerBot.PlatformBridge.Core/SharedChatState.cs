@@ -9,7 +9,7 @@ namespace StreamerBot.PlatformBridge.Core;
 public static class SharedChatState
 {
     private static readonly object Sync = new object();
-    private static readonly string[] Platforms = { "twitch", "youtube", "kick", "rumble", "joystick" };
+    private static readonly string[] Platforms = { "twitch", "youtube", "kick", "rumble", "joystick", "altstream" };
 
     /// <summary>Reads or updates display preferences; returns a sanitized broadcast envelope.</summary>
     /// <param name="arguments">Operation, platform and enabled arguments from the browser.</param>
@@ -25,6 +25,7 @@ public static class SharedChatState
         {
             var raw = read();
             var state = string.IsNullOrEmpty(raw) ? new State() : JsonConvert.DeserializeObject<State>(raw) ?? new State();
+            if (!state.Enabled.ContainsKey("altstream")) state.Enabled["altstream"] = true;
             var operation = Text(arguments, "operation");
             if (operation == "platform")
             {
@@ -54,3 +55,4 @@ public static class SharedChatState
         public Dictionary<string, bool> Enabled { get; set; } = Platforms.ToDictionary(platform => platform, platform => platform != "joystick");
     }
 }
+

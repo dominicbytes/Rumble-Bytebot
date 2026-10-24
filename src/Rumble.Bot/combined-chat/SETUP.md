@@ -1,5 +1,5 @@
 # Combined chat setup
 
-See [README.md](README.md) for installation, platform toggles, OBS use, connection settings, history, and event coverage.
+Install ONLY ONE combined chat. This folder is identical in every Bytebot package; keep a single copy, map only that copy in Streamer.bot's HTTP server, and point every OBS dock and Browser Source at it.
 
-The display is the same in both plugin packages. Keep one copy; it supports any combination of Twitch, YouTube, Kick, Rumble, and Joystick.TV.
+See [README.md](README.md) for setup, version checks, shared controls and supported events.

@@ -1,33 +1,41 @@
-# Shared combined chat — September 10 update
+# Bytebot combined chat — version 2026.10.22
 
-One identical `combined-chat` folder is bundled with both plugins. Keep one active folder; every OBS dock/source connects to the same Streamer.bot WebSocket endpoint. HTTP and local-file displays are supported. No Node server is required for normal use.
+This `combined-chat` folder is identical in Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot. It shows Twitch, YouTube, Kick, Rumble, AltStream and (when enabled) Joystick.TV chat in one feed.
 
-## Important: this update requires an action import and a DLL update
+## Install ONLY ONE combined chat
 
-1. Back up the existing plugin DLLs and chat folder, and export your plugin actions.
-2. Close Streamer.bot completely. Copy the package's `dlls` contents into your real Streamer.bot `dlls` folder. If updating both plugins, use both plugin DLLs and only one copy of `StreamerBot.PlatformBridge.Core.dll`.
-3. Replace the entire `combined-chat` folder, including assets.
-4. Start Streamer.bot and import the package's `.sb` bundle. It includes **[Combined Chat] Controls**. Both packages use the same ID for this shared action; only one shared Controls action is needed. Preserve any personal modifications when reviewing the import.
-5. Reload each OBS dock and browser source once to load this version. After that, changing a platform or clicking Clear chat updates all connected displays without refreshing.
+Install exactly one `combined-chat` folder, no matter how many Bytebot plugins you use.
 
-Unlike the previous HTML-only update, replacing just HTML is NOT sufficient. If shared controls remain disabled, confirm the new DLL is installed, Streamer.bot was restarted, and **[Combined Chat] Controls** is imported and enabled. The display says **Controls synced across displays** when ready.
+- Keep one folder in a permanent location, for example `C:\StreamerBot\combined-chat`.
+- Map only that folder in Streamer.bot's HTTP server, and point every OBS dock and Browser Source at it.
+- When a plugin package includes a newer chat version than the one you have, replace the **contents** of your one folder with the package's `combined-chat` contents. Do not add a second folder or a second HTTP mapping.
+- Check the installed version in this README's title or in `index.html` (`bytebot-chat-version`). Skip the copy when your installed version is the same or newer.
 
-## Shared controls
+Every package also ships the same **[Combined Chat] Controls** action, built on the shared `StreamerBot.PlatformBridge.Core.dll`. Importing it from any package gives the same action, so import order does not matter. Keep one copy of `StreamerBot.PlatformBridge.Core.dll` in Streamer.bot's `dlls` folder; every package ships the same file.
 
-Use **Platforms** to select any combination of Twitch, YouTube, Kick, Rumble and Joystick.TV. Choices are now saved centrally in the dedicated persisted Streamer.bot global `bytebot.sharedChat.controls.v1`, not independently per browser. Initial defaults enable all except Joystick. Old `platforms=` URL parameters no longer override the shared state.
+## Setup
 
-**Clear chat** clears the combined display and its saved history across connected views. It does NOT delete messages from Twitch, YouTube, Kick, Rumble or Joystick, nor modify platform moderation or reward state. A view that was disconnected applies the saved clear when it reconnects. New chat continues normally. Clear has no undo; use it intentionally.
+1. Streamer.bot **Servers/Clients > WebSocket Server**: address `127.0.0.1`, port `8080`, endpoint `/`, Auto Start on. Authentication must stay disabled for this display.
+2. Streamer.bot **Servers/Clients > HTTP Server**: host `127.0.0.1`, port `7474`, Auto Start on. Add the mapping `combined-chat` pointing at your one folder.
+3. Open `http://127.0.0.1:7474/combined-chat/index.html` and confirm the status reads **Connected**.
+4. OBS custom docks need that URL. A Browser Source can use the URL or the local `index.html` file (the file keeps loading while Streamer.bot is closed). A starting size of 420 × 700 works well; leave **Shutdown source when not visible** off.
+5. After replacing the folder, reload each dock and Browser Source once.
 
-Each view still caches up to 200 received entries for seven days so history can render immediately; it is not a centralized archive and cannot retrieve messages missed while that view was offline. Platform filtering and clear state are centralized. The display deliberately ignores Rumble stream-status notices, including old cached status rows.
+Use `?ws=ws://127.0.0.1:PORT/` on every display if your WebSocket port differs. Keep the WebSocket server on loopback.
 
-## Connection and OBS
+## What the display does
 
-Default WebSocket: `ws://127.0.0.1:8080/`. Override using `?ws=ws://127.0.0.1:PORT/` on every display. Keep the server restricted to loopback; this page currently supports unauthenticated local connections. Enable the WebSocket server's auto-start setting.
+- **Platforms** and **Clear chat** are shared across every open display through the persisted Streamer.bot global `bytebot.sharedChat.controls.v1`. Joystick.TV starts disabled. Clear chat clears the display only; it never moderates a platform.
+- Native Twitch, YouTube and Kick emotes, badges and name colors render when Streamer.bot supplies them. Broken images fall back to their names.
+- Paid events (rants, cheers, Super Chats, Kicks, tips, wheel spins) are highlighted.
+- Twitch deleted messages, chat clears, bans and timeouts remove the affected Twitch rows from the display and its saved history. YouTube and Kick removal is not yet supported because Streamer.bot does not document those payloads.
+- AltStream message deletes and chat clears remove AltStream rows. AltStream redemptions, shoutouts, outgoing raids and incoming raids appear as event rows, and highlighted messages appear as accented chat rows. AltStream follows are streamer-only on AltStream, so they fire triggers but are not shown.
+- Scrolling up pauses auto-scroll. A **new messages** button appears; click it or scroll to the bottom to resume.
+- Each display keeps up to 200 rows for seven days so it can redraw immediately. It cannot recover messages missed while it was offline.
+- Rumble stream-status notices and Joystick presence/viewer-count notices are never shown.
 
-For a Browser Source, the local `index.html` can load even while Streamer.bot's HTTP server is off. A custom dock can continue using its existing HTTP URL. Both will synchronize through the same WebSocket connection endpoint, even with different browser storage. The page retries lost WebSocket connections every five seconds.
+## Overlay Event action
 
-OBS Browser Sources can use **Interact** to operate the controls. Do not point a production source at the development fake-server URL.
+With Rumble-Bytebot installed, run `[Rumble.Bot] Overlay Event` with `platform` (`twitch`, `youtube`, `kick` or `rumble`) and `message`; optional `eventType` and `userName`/`displayName`. The page renders the text without HTML.
 
-Username resolution accepts native structured event users, flat user-name fields, and the Streamer.bot `user`/`userName`/`displayName` action variables used by the Rumble Overlay Event action. A username must be present in the originating event or action arguments; the display does not invent one.
-
-Rumble/Joystick require their respective plugin connections for live data. Rumble public-API limitations still apply. Private whispers and private moderation payloads are not shown.
+Rumble and Joystick.TV need their plugins running for live data. Rumble chat only arrives while the Rumble channel is live; use `[Rumble.Bot] Test` offline.

@@ -3,8 +3,12 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
 
-const rumblePath = path.resolve(__dirname, "../src/Rumble.Bot/combined-chat/app.js");
-const appPath = fs.existsSync(rumblePath) ? rumblePath : path.resolve(__dirname, "../src/JoystickTV.Bot/combined-chat/app.js");
+// The same standard chat ships in every Bytebot repository; test whichever copy this repository has.
+const appPath = [
+  "../src/Rumble.Bot/combined-chat/app.js",
+  "../src/JoystickTV.Bot/combined-chat/app.js",
+  "../src/Altstream.Bot/combined-chat/app.js"
+].map(file => path.resolve(__dirname, file)).find(file => fs.existsSync(file));
 const appSource = fs.readFileSync(appPath, "utf8");
 const storage = new Map();
 
@@ -13,9 +17,12 @@ class Element {
     this.tagName = tagName.toUpperCase();
     this.children = [];
     this.dataset = {};
+    this.style = {};
+    this.listeners = {};
     this.className = "";
     this.textContent = "";
     this.parent = null;
+    this.scrollCount = 0;
   }
 
   appendChild(child) {
@@ -28,7 +35,17 @@ class Element {
     children.forEach(child => this.appendChild(child));
   }
 
-  addEventListener() {}
+  replaceChildren(...children) {
+    this.children = [];
+    this.append(...children);
+  }
+
+  replaceWith(node) {
+    node.parent = this.parent;
+    this.parent.children[this.parent.children.indexOf(this)] = node;
+  }
+
+  addEventListener(name, callback) { (this.listeners[name] ||= []).push(callback); }
 
   remove() {
     if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1);
@@ -36,14 +53,26 @@ class Element {
 
   get childElementCount() { return this.children.length; }
   get firstElementChild() { return this.children[0]; }
-  scrollIntoView() {}
+  scrollIntoView() { this.scrollCount++; }
 }
 
 function createPage() {
-  const chat = new Element("main");
-  const status = new Element("span");
+  const elements = new Map(["chat", "status", "platforms", "clear-chat", "control-status", "jump-latest"]
+    .map(id => [id, new Element(id === "chat" ? "main" : "span")]));
+  const chat = elements.get("chat");
+  const status = elements.get("status");
   const timers = [];
+  const intervals = [];
   const sockets = [];
+  const windowListeners = {};
+  const document = {
+    hidden: false,
+    scrollingElement: null,
+    getElementById: id => elements.get(id),
+    createElement: tag => new Element(tag),
+    createTextNode: text => Object.assign(new Element("#text"), { textContent: text }),
+    addEventListener() {}
+  };
 
   class MockWebSocket {
     static CONNECTING = 0;
@@ -54,6 +83,7 @@ function createPage() {
     constructor() {
       this.readyState = MockWebSocket.CONNECTING;
       this.listeners = {};
+      this.sent = [];
       sockets.push(this);
     }
 
@@ -61,7 +91,11 @@ function createPage() {
       (this.listeners[name] ||= []).push(callback);
     }
 
-    send(value) { this.subscription = JSON.parse(value); }
+    send(value) {
+      const request = JSON.parse(value);
+      this.sent.push(request);
+      if (request.request === "Subscribe") this.subscription = request;
+    }
     open() { this.readyState = MockWebSocket.OPEN; this.emit("open", {}); }
     message(value) { this.emit("message", { data: JSON.stringify(value) }); }
     close() { this.readyState = MockWebSocket.CLOSED; this.emit("close", {}); }
@@ -84,22 +118,21 @@ function createPage() {
       getItem: key => storage.has(key) ? storage.get(key) : null,
       setItem: (key, value) => storage.set(key, value)
     },
-    document: {
-      hidden: false,
-      getElementById: id => id === "chat" ? chat : status,
-      createElement: tag => new Element(tag),
-      createTextNode: text => Object.assign(new Element("#text"), { textContent: text }),
-      addEventListener() {}
-    },
+    document,
     window: {
-      addEventListener() {},
-      setInterval() {},
+      addEventListener(name, callback) { (windowListeners[name] ||= []).push(callback); },
+      setInterval(callback) { intervals.push(callback); },
       setTimeout: callback => { timers.push(callback); return timers.length; }
     }
   });
 
   vm.runInContext(appSource, context, { filename: appPath });
-  return { chat, status, sockets, runTimer: () => timers.shift()?.() };
+  return {
+    chat, status, sockets, document, elements,
+    runTimer: () => timers.shift()?.(),
+    runIntervals: () => intervals.forEach(callback => callback()),
+    fireWindow: name => (windowListeners[name] || []).forEach(callback => callback({}))
+  };
 }
 
 storage.clear();
@@ -287,3 +320,97 @@ presenceRestoredPage.sockets[0].message({
 assert.equal(presenceRestoredPage.chat.children.length, 3, 'Follow events must remain visible');
 assert.equal(JSON.parse(storage.get(historyKey)).length, 3, 'Saved history must exclude cached presence notices');
 console.log('Joystick presence filtering regression tests passed.');
+
+// Standard shared chat features.
+storage.clear();
+const featurePage = createPage();
+const featureSocket = featurePage.sockets[0];
+featureSocket.open();
+const now = new Date().toISOString();
+const customEvent = (eventName, args) => featureSocket.message({ event: { source: 'Custom', type: 'CodeEvent' }, data: { eventName, arguments: args } });
+const twitchEvent = (type, data) => featureSocket.message({ event: { source: 'Twitch', type }, data });
+const rowIds = () => featurePage.chat.children.map(row => row.dataset.messageId);
+const rowText = row => row.children[1].children.at(-1).children.map(child => child.textContent).join('');
+
+for (const type of ['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut']) {
+  assert(featureSocket.subscription.events.Twitch.includes(type), `Twitch.${type} must be subscribed`);
+}
+featureSocket.message({ id: 'platform-bridge-chat', status: 'ok' });
+featurePage.runIntervals();
+featurePage.runIntervals();
+assert.equal(featureSocket.sent.filter(request => request.request === 'DoAction').length, 1, 'Controls are read once per connection, not on every heartbeat');
+assert.equal(featureSocket.sent.filter(request => request.request === 'GetInfo').length, 2, 'Heartbeat still checks the connection');
+
+const twitchChat = (messageId, id, login, text) => twitchEvent('ChatMessage', {
+  messageId, createdAt: now, text, user: { id, login, name: login, color: '#FF4500', badges: [] }
+});
+twitchChat('t1', 'u1', 'alpha', 'one');
+twitchChat('t2', 'u2', 'beta', 'two');
+twitchChat('t3', 'u1', 'alpha', 'three');
+customEvent('bridge.rumble.chat_message', { userName: 'RumbleFan', message: 'rumble', createdAt: now, messageId: 'r1' });
+assert.equal(featurePage.chat.children[0].children[1].children[0].children.at(-1).style.color, '#FF4500', 'Native user colors render');
+
+twitchEvent('ChatMessageDeleted', { messageId: 't2', targetUser: { id: 'u2', login: 'beta', name: 'beta' } });
+assert.deepEqual(rowIds(), ['t1', 't3', 'r1']);
+twitchEvent('UserTimedOut', { targetUser: { id: 'u1', login: 'alpha', name: 'Alpha' } });
+assert.deepEqual(rowIds(), ['r1']);
+twitchChat('t4', 'u3', 'gamma', 'four');
+twitchEvent('UserBanned', { targetUser: { login: 'GAMMA', name: 'Gamma' } });
+assert.deepEqual(rowIds(), ['r1'], 'Bans match by login when the id is absent');
+twitchChat('t5', 'u4', 'delta', 'five');
+twitchEvent('ChatCleared', {});
+assert.deepEqual(rowIds(), ['r1'], 'Twitch clear removes only Twitch chat');
+assert.equal(createPage().chat.children.length, 1, 'Removed rows stay removed after reload');
+
+customEvent('bridge.rumble.rant', { userName: 'Fan', amountDollars: 5, message: 'gg', createdAt: now });
+assert.match(featurePage.chat.children.at(-1).className, /\bpaid-event\b/, 'Rants are highlighted');
+twitchEvent('Cheer', { id: 'cheer-1', createdAt: now, user: { name: 'Cheerer' }, bits: 100 });
+assert.match(featurePage.chat.children.at(-1).className, /\bpaid-event\b/, 'Cheers are highlighted');
+twitchEvent('Follow', { id: 'follow-1', createdAt: now, user_name: 'Follower' });
+assert.doesNotMatch(featurePage.chat.children.at(-1).className, /\bpaid-event\b/, 'Follows are not highlighted');
+
+const rowsBeforeAltstream = featurePage.chat.children.length;
+customEvent('bridge.altstream.reward_redemption', { userName: 'fan', displayName: 'Fan', rewardName: 'Hydrate', messageId: 'as-r1', createdAt: now });
+customEvent('bridge.altstream.shoutout', { targetUserName: 'friend', targetDisplayName: 'Friend', gameName: 'Doom', messageId: 'as-s1', createdAt: now });
+customEvent('bridge.altstream.raid_started', { targetDisplayName: 'Friend', messageId: 'as-raid1', createdAt: now });
+customEvent('bridge.altstream.raid_cancelled', { messageId: 'as-raid2', createdAt: now });
+customEvent('bridge.altstream.raid_received', { userName: 'raider', displayName: 'raider', viewers: 15, messageId: 'as-raid3', createdAt: now });
+customEvent('bridge.altstream.highlighted_message', { userName: 'fan', displayName: 'Fan', message: 'look at me', messageId: 'as-h1', createdAt: now });
+for (const hidden of ['follow', 'system_message', 'chat_pinned', 'chat_unpinned']) {
+  customEvent(`bridge.altstream.${hidden}`, { userName: 'fan', messageId: `as-${hidden}`, createdAt: now });
+}
+assert.deepEqual(featurePage.chat.children.slice(rowsBeforeAltstream).map(rowText), [
+  'Fan redeemed Hydrate', 'Shoutout: check out Friend — streaming Doom', 'Raid started to Friend', 'Raid cancelled',
+  'raider is raiding with 15 viewers', 'look at me'
+]);
+assert(featurePage.chat.children.slice(rowsBeforeAltstream).every(row => row.dataset.platform === 'altstream'));
+assert.match(featurePage.chat.children.at(-1).className, /\bchat-message\b.*\bpaid-event\b/, 'Highlighted messages render as accented chat');
+
+const emoteRow = featurePage.chat.children.length;
+twitchEvent('ChatMessage', { messageId: 'emote-1', createdAt: now, user: { name: 'Viewer' }, text: 'Hi Kappa',
+  emotes: [{ Name: 'Kappa', StartIndex: 3, EndIndex: 7, ImageUrl: 'https://example.test/broken.png' }] });
+const emoteBody = featurePage.chat.children[emoteRow].children[1].children[1];
+const brokenImage = emoteBody.children.find(child => child.tagName === 'IMG');
+brokenImage.onerror();
+assert.equal(emoteBody.children.map(child => child.textContent).join(''), 'Hi Kappa', 'Broken emote images fall back to their name');
+
+featurePage.document.scrollingElement = { scrollHeight: 1000, scrollTop: 0, clientHeight: 300 };
+const jump = featurePage.elements.get('jump-latest');
+twitchChat('scroll-1', 'u9', 'reader', 'while scrolled up');
+const pausedRow = featurePage.chat.children.at(-1);
+assert.equal(pausedRow.scrollCount, 0, 'Reading older chat is not interrupted');
+assert.equal(jump.hidden, false);
+assert.match(jump.textContent, /1 new message/);
+twitchChat('scroll-2', 'u9', 'reader', 'second');
+assert.match(jump.textContent, /2 new messages/);
+jump.listeners.click.forEach(callback => callback({}));
+assert.equal(jump.hidden, true);
+assert(featurePage.chat.children.at(-1).scrollCount > 0, 'Jump scrolls to the newest row');
+featurePage.document.scrollingElement.scrollTop = 0;
+twitchChat('scroll-3', 'u9', 'reader', 'third');
+featurePage.document.scrollingElement.scrollTop = 700;
+featurePage.fireWindow('scroll');
+assert.equal(jump.hidden, true, 'Scrolling back to the bottom resumes following');
+twitchChat('scroll-4', 'u9', 'reader', 'fourth');
+assert(featurePage.chat.children.at(-1).scrollCount > 0);
+console.log('Standard shared chat feature tests passed.');

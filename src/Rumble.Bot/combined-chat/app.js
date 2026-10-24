@@ -19,6 +19,7 @@
     youtube: "assets/youtube.png",
     kick: "assets/kick.png",
     rumble: "assets/rumble.png",
+    altstream: "assets/altstream.png",
     joystick: "assets/joystick.svg"
   };
   const subscriptions = {
@@ -34,7 +35,8 @@
       "PollCreated", "PollUpdated", "PollCompleted", "PollTerminated", "PollArchived",
       "PredictionCreated", "PredictionUpdated", "PredictionCompleted", "PredictionCanceled", "PredictionLocked",
       "RewardRedemptionUpdated", "RaidCancelled", "SharedChatAnnouncement", "SharedChatCommunitySubGift",
-      "SharedChatPrimePaidUpgrade", "SharedChatGiftPaidUpgrade", "SharedChatPayItForward", "Modiversary", "SharedModiversary"
+      "SharedChatPrimePaidUpgrade", "SharedChatGiftPaidUpgrade", "SharedChatPayItForward", "Modiversary", "SharedModiversary",
+      "ChatMessageDeleted", "ChatCleared", "UserBanned", "UserTimedOut"
     ],
     YouTube: [
       "Message", "BroadcastEnded", "BroadcastStarted", "GiftMembershipReceived", "JewelsGifted",
@@ -48,6 +50,9 @@
     Custom: ["CodeEvent"],
     General: ["Custom"]
   };
+  // Twitch moderation removes rows; YouTube and Kick publish no documented payload schema for this yet.
+  const twitchModeration = new Set(["ChatMessageDeleted", "ChatCleared", "UserBanned", "UserTimedOut"]);
+  const paidEventTypes = new Set(["cheer", "coincheer", "hypechat", "charitydonation", "superchat", "supersticker", "kicksgifted", "jewelsgifted"]);
 
   let socket = null;
   let reconnectTimer = null;
@@ -58,6 +63,8 @@
   const controls = new Map();
   const clearButton = document.getElementById("clear-chat");
   const controlStatus = document.getElementById("control-status");
+  const jumpButton = document.getElementById("jump-latest");
+  let unseenRows = 0;
   let sharedReady = false;
   let sharedRevision = -1;
   let enabled = Object.keys(platformLogos).filter(platform => platform !== "joystick");
@@ -81,6 +88,16 @@
   });
   clearButton.disabled = true;
   clearButton.addEventListener("click", () => sendControl("clear"));
+  if (jumpButton) {
+    jumpButton.hidden = true;
+    jumpButton.addEventListener("click", () => {
+      resumeFollowing();
+      const newest = Array.from(chat.children).reverse().find(row => !row.hidden);
+      if (newest) newest.scrollIntoView({ block: "end" });
+    });
+  }
+  // Scrolling up in a dock pauses auto-scroll until the reader returns to the newest row.
+  window.addEventListener("scroll", () => { if (isAtBottom()) resumeFollowing(); });
 
   history.forEach(model => append(model, false));
   connect();
@@ -141,10 +158,8 @@
       scheduleReconnect();
       return;
     }
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ request: "GetInfo", id: "chat-heartbeat" }));
-      sendControl("get");
-    }
+    // Shared controls are read after each subscription; later changes arrive as broadcasts.
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ request: "GetInfo", id: "chat-heartbeat" }));
     if (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) scheduleReconnect();
   }
 
@@ -184,6 +199,10 @@
       return;
     }
     if (!platformLogos[source]) return;
+    if (source === "twitch" && twitchModeration.has(type)) {
+      moderateTwitch(type, envelope.data);
+      return;
+    }
     const data = { ...envelope.data, timeStamp: envelope.data.timeStamp || envelope.timeStamp };
     if (isChatEvent(source, type)) append(normalizeNative(source, data));
     else append(normalizeNativeEvent(source, type, data));
@@ -193,12 +212,41 @@
     const name = data.eventName || data.name;
     if (name === "bridge.rumble.stream_status") return;
     const args = data.arguments || data.args || data;
+    if (name === "bridge.altstream.chat_message" || name === "bridge.altstream.highlighted_message") {
+      let parts = [];
+      try { parts = JSON.parse(args.messagePartsJson || "[]"); } catch { }
+      const text = String(args.message || "");
+      const model = chatModel("altstream", args.displayName || args.userName, text, [],
+        normalizeMessageParts(text, parts, []), args.createdAt || args.observedAt, args.messageId);
+      if (validColor(args.userColor)) model.userColor = args.userColor;
+      // Highlighted messages are bought with channel points, so they get the same accent as paid events.
+      if (name === "bridge.altstream.highlighted_message") model.paid = true;
+      append(model);
+      return;
+    }
+    if (name === "bridge.altstream.message_deleted") {
+      const deleted = String(args.deletedMessageId || "");
+      if (deleted) removeRows(model => model.platform === "altstream" && model.id === deleted);
+      return;
+    }
+    if (name === "bridge.altstream.chat_cleared") {
+      removeRows(model => model.platform === "altstream");
+      return;
+    }
+    if (String(name || "").startsWith("bridge.altstream.")) {
+      // Follows are streamer-only on AltStream, so they trigger actions but are not shown on stream.
+      const text = altstreamActivityText(String(name).slice("bridge.altstream.".length), args);
+      if (text) append(eventModel("altstream", name, text, { ...args, eventId: args.messageId }));
+      return;
+    }
     if (name === "bridge.joystick.chat_message") {
       let emotes = [];
       try { emotes = normalizeAssets(JSON.parse(args.emotesJson || "[]"), false); } catch { }
       const text = String(args.message || "");
-      append(chatModel("joystick", args.displayName || args.userName, text, parseBadges(args.badgesJson),
-        normalizeMessageParts(text, [], emotes), args.createdAt, args.messageId));
+      const model = chatModel("joystick", args.displayName || args.userName, text, parseBadges(args.badgesJson),
+        normalizeMessageParts(text, [], emotes), args.createdAt, args.messageId);
+      if (validColor(args.userColor)) model.userColor = args.userColor;
+      append(model);
       return;
     }
     if (String(name || "").startsWith("bridge.joystick.")) {
@@ -212,7 +260,9 @@
       else if (type === "gifted_subs") text = `${user} gifted ${args.count || 1} subscriptions`;
       else if (type === "followed") text = `${user} followed`;
       else if (type === "drop_in") text = `${user} dropped in with ${args.viewerCount || 0} viewers`;
-      append(eventModel("joystick", name, text, args));
+      const model = eventModel("joystick", name, text, args);
+      if (type === "tipped" || type === "wheel_spin_claimed") model.paid = true;
+      append(model);
       return;
     }
     if (name === "bridge.rumble.chat_message") {
@@ -249,7 +299,7 @@
     const text = firstString(message.message, message.text, data.message, data.text);
     const emotes = normalizeAssets(message.emotes || data.emotes, false);
     const structuredParts = message.parts || data.parts || data.messageParts;
-    return chatModel(
+    const model = chatModel(
       platform,
       firstString(user.display, user.displayName, user.name, data.userName, data.displayName, data.authorName, "Unknown"),
       text,
@@ -258,6 +308,12 @@
       firstString(data.createdAt, data.timestamp, data.timeStamp),
       firstString(data.messageId, message.msgId, message.id, data.id)
     );
+    // Identity is kept so Twitch bans and timeouts can remove the user's rows.
+    model.userId = firstString(user.id, user.userId, data.userId);
+    model.userLogin = firstString(user.login, user.name, data.userLogin);
+    const color = firstString(user.color, data.color, data.userColor);
+    if (validColor(color)) model.userColor = color;
+    return model;
   }
 
   function chatModel(platform, name, text, badges, parts, createdAt, id) {
@@ -310,7 +366,9 @@
     else if (lower.includes("streamoffline") || lower.includes("broadcastended")) text = `${platformName(platform)} stream ended`;
     else text = `${platformName(platform)}: ${humanize(type)}`;
 
-    return eventModel(platform, type, text, data);
+    const model = eventModel(platform, type, text, data);
+    if (paidEventTypes.has(lower)) model.paid = true;
+    return model;
   }
 
   function normalizeRumbleEvent(name, data) {
@@ -324,7 +382,9 @@
     else if (type === "subscription") text = `${user} subscribed`;
     else if (type === "gifted_sub") text = `${user} gifted ${data.count || 1} subscription${Number(data.count || 1) === 1 ? "" : "s"}`;
     else text = `Rumble: ${humanize(type)}`;
-    return eventModel("rumble", type, text, data);
+    const model = eventModel("rumble", type, text, data);
+    if (type === "rant") model.paid = true;
+    return model;
   }
 
   function normalizeOverlayEvent(data) {
@@ -421,10 +481,15 @@
     if (displayedKeys.has(key)) return;
     displayedKeys.add(key);
 
+    const following = isAtBottom();
     const row = document.createElement("article");
-    row.className = `message ${model.kind === "event" ? "stream-event" : "chat-message"}`;
+    row.className = `message ${model.kind === "event" ? "stream-event" : "chat-message"}${model.paid ? " paid-event" : ""}`;
     row.dataset.platform = model.platform;
+    row.dataset.kind = model.kind;
     row.dataset.key = key;
+    row.dataset.messageId = model.id;
+    row.dataset.userId = model.userId || "";
+    row.dataset.userLogin = model.userLogin || "";
     row.hidden = !enabled.includes(model.platform);
     const logo = document.createElement("img");
     logo.className = "platform-logo";
@@ -440,6 +505,7 @@
       const name = document.createElement("span");
       name.className = "name";
       name.textContent = model.name;
+      if (validColor(model.userColor)) name.style.color = model.userColor;
       meta.appendChild(name);
       content.appendChild(meta);
     }
@@ -456,7 +522,10 @@
       displayedKeys.delete(chat.firstElementChild.dataset.key);
       chat.firstElementChild.remove();
     }
-    if (!row.hidden) row.scrollIntoView({ block: "end" });
+    if (!row.hidden) {
+      if (following || !persist) row.scrollIntoView({ block: "end" });
+      else noteUnseenRow();
+    }
 
     if (persist) {
       history.push(model);
@@ -478,7 +547,71 @@
     img.src = url;
     img.alt = assetName(asset);
     img.loading = "lazy";
+    img.onerror = () => img.replaceWith(document.createTextNode(img.alt || ""));
     return img;
+  }
+
+  function removeRows(matches) {
+    history = history.filter(model => !matches(model));
+    Array.from(chat.children).forEach(row => {
+      const model = { platform: row.dataset.platform, kind: row.dataset.kind, id: row.dataset.messageId,
+        userId: row.dataset.userId, userLogin: row.dataset.userLogin };
+      if (!matches(model)) return;
+      displayedKeys.delete(row.dataset.key);
+      row.remove();
+    });
+    saveHistory();
+  }
+
+  function moderateTwitch(type, data) {
+    const isTwitchChat = model => model.platform === "twitch" && model.kind === "chat";
+    if (type === "ChatCleared") {
+      removeRows(isTwitchChat);
+      return;
+    }
+    if (type === "ChatMessageDeleted") {
+      const id = firstString(data.messageId, data.targetMessageId);
+      if (id) removeRows(model => isTwitchChat(model) && model.id === id);
+      return;
+    }
+    const target = data.targetUser || {};
+    const userId = firstString(target.id, data.user_id);
+    const login = firstString(target.login, data.user_login, target.name).toLowerCase();
+    if (!userId && !login) return;
+    removeRows(model => isTwitchChat(model) &&
+      ((userId && model.userId === userId) || (login && String(model.userLogin || "").toLowerCase() === login)));
+  }
+
+  function altstreamActivityText(type, data) {
+    const user = firstString(data.displayName, data.userName) || "Someone";
+    const target = firstString(data.targetDisplayName, data.targetUserName);
+    if (type === "reward_redemption") return `${user} redeemed ${firstString(data.rewardName) || "a reward"}`;
+    if (type === "shoutout") return target ? `Shoutout: check out ${target}${data.gameName ? ` — streaming ${data.gameName}` : ""}` : "";
+    if (type === "raid_started") return `Raid started${target ? ` to ${target}` : ""}`;
+    if (type === "raid_cancelled") return "Raid cancelled";
+    if (type === "raid_received") return `${user} is raiding${Number(data.viewers) > 0 ? ` with ${Number(data.viewers)} viewers` : ""}`;
+    return "";
+  }
+
+  function isAtBottom() {
+    const root = document.scrollingElement;
+    return !root || root.scrollHeight - root.scrollTop - root.clientHeight < 48;
+  }
+
+  function noteUnseenRow() {
+    if (!jumpButton) return;
+    unseenRows++;
+    jumpButton.textContent = `${unseenRows} new message${unseenRows === 1 ? "" : "s"} ↓`;
+    jumpButton.hidden = false;
+  }
+
+  function resumeFollowing() {
+    unseenRows = 0;
+    if (jumpButton) jumpButton.hidden = true;
+  }
+
+  function validColor(value) {
+    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
   }
 
   function loadHistory() {
@@ -527,7 +660,7 @@
     if (!state || !Number.isSafeInteger(state.Revision) || !state.Enabled || typeof state.ClearedAt !== "string") return;
     if (state.Revision < sharedRevision) return;
     sharedRevision = state.Revision;
-    enabled = Object.keys(platformLogos).filter(platform => state.Enabled[platform] === true);
+    enabled = Object.keys(platformLogos).filter(platform => (state.Enabled[platform] === true || (platform === "altstream" && state.Enabled.altstream === undefined)));
     controls.forEach((input, platform) => { input.checked = enabled.includes(platform); });
     if (state.ClearedAt && state.ClearedAt !== clearedAt && Number.isFinite(Date.parse(state.ClearedAt))) {
       clearedAt = state.ClearedAt;
@@ -619,7 +752,7 @@
   }
 
   function platformName(platform) {
-    return platform === "youtube" ? "YouTube" : platform === "joystick" ? "Joystick.TV" : platform.charAt(0).toUpperCase() + platform.slice(1);
+    return platform === "altstream" ? "AltStream" : platform === "youtube" ? "YouTube" : platform === "joystick" ? "Joystick.TV" : platform.charAt(0).toUpperCase() + platform.slice(1);
   }
 
   function safeUrl(value) {
@@ -632,3 +765,5 @@
     status.className = className;
   }
 })();
+
+
