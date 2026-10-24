@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Deterministic>true</Deterministic>
+    <!-- Keep local build folders out of compiled DLLs. -->
+    <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>0.1.2-local.3</Version>
     <Authors>Dominic Bytes</Authors>
