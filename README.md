@@ -34,7 +34,7 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Notes
 
-I vibe coded this in GPT Sol 5.6. I have tested it on my own stream and it works. Use at your own risk.
+I vibe coded this in GPT Sol 5.6, Sol 6.1, and Claude Opus 5.5. I have tested it on my own stream and it works. Use at your own risk.
 
 ## About Dominic Bytes
 
