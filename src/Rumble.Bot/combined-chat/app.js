@@ -65,6 +65,9 @@
   const controlStatus = document.getElementById("control-status");
   const jumpButton = document.getElementById("jump-latest");
   let unseenRows = 0;
+  let following = true;
+  let readerScrollUntil = 0;
+  let pointerHeld = false;
   let sharedReady = false;
   let sharedRevision = -1;
   let enabled = Object.keys(platformLogos).filter(platform => platform !== "joystick");
@@ -92,12 +95,25 @@
     jumpButton.hidden = true;
     jumpButton.addEventListener("click", () => {
       resumeFollowing();
-      const newest = Array.from(chat.children).reverse().find(row => !row.hidden);
-      if (newest) newest.scrollIntoView({ block: "end" });
+      showNewest();
     });
   }
-  // Scrolling up in a dock pauses auto-scroll until the reader returns to the newest row.
-  window.addEventListener("scroll", () => { if (isAtBottom()) resumeFollowing(); });
+  // Only a reader scrolling up pauses auto-scroll; it resumes at the newest row. OBS sources cannot scroll,
+  // so layout changes (such as images loading while a scene is hidden) must never pause it.
+  const scrollKeys = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+  const noteReaderScroll = () => { readerScrollUntil = Date.now() + 1000; };
+  window.addEventListener("wheel", noteReaderScroll, { passive: true });
+  window.addEventListener("touchmove", noteReaderScroll, { passive: true });
+  window.addEventListener("keydown", event => { if (scrollKeys.has(event.key)) noteReaderScroll(); });
+  window.addEventListener("pointerdown", () => { pointerHeld = true; });
+  window.addEventListener("pointerup", () => { pointerHeld = false; noteReaderScroll(); });
+  window.addEventListener("pointercancel", () => { pointerHeld = false; });
+  window.addEventListener("scroll", () => {
+    if (isAtBottom()) resumeFollowing();
+    else if (pointerHeld || Date.now() < readerScrollUntil) following = false;
+  });
+  window.addEventListener("resize", keepFollowing);
+  if (typeof ResizeObserver === "function") new ResizeObserver(keepFollowing).observe(document.body || chat);
 
   history.forEach(model => append(model, false));
   connect();
@@ -105,7 +121,9 @@
   window.addEventListener("online", reconnectNow);
   window.addEventListener("pageshow", reconnectNow);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) reconnectNow();
+    if (document.hidden) return;
+    reconnectNow();
+    keepFollowing();
   });
 
   function connect() {
@@ -250,7 +268,8 @@
       return;
     }
     if (String(name || "").startsWith("bridge.joystick.")) {
-      if (args.streamEventType === "ViewerCountUpdated") return;
+      // Viewer- and follower-count updates (ViewerCountUpdated, follower_count_updated) are stats, not chat.
+      if (/count[ _-]?updated$/i.test(String(args.streamEventType || ""))) return;
       const type = String(name).slice("bridge.joystick.".length);
       const user = eventUser(args);
       let text = `${user}: ${humanize(args.streamEventType || type)}`;
@@ -481,7 +500,6 @@
     if (displayedKeys.has(key)) return;
     displayedKeys.add(key);
 
-    const following = isAtBottom();
     const row = document.createElement("article");
     row.className = `message ${model.kind === "event" ? "stream-event" : "chat-message"}${model.paid ? " paid-event" : ""}`;
     row.dataset.platform = model.platform;
@@ -606,8 +624,18 @@
   }
 
   function resumeFollowing() {
+    following = true;
     unseenRows = 0;
     if (jumpButton) jumpButton.hidden = true;
+  }
+
+  function showNewest() {
+    const newest = Array.from(chat.children).reverse().find(row => !row.hidden);
+    if (newest) newest.scrollIntoView({ block: "end" });
+  }
+
+  function keepFollowing() {
+    if (following) showNewest();
   }
 
   function validColor(value) {
@@ -636,7 +664,7 @@
     if (model.platform === "joystick" && model.kind === "event" &&
       (model.eventType === "bridge.joystick.user_entered" || model.eventType === "bridge.joystick.user_left")) return true;
     if (model.platform === "joystick" && model.kind === "event" && model.eventType === "bridge.joystick.stream_event") {
-      return /^.+: Viewer Count Updated$/.test(model.text);
+      return /^.+: \w+ count updated$/i.test(model.text);
     }
     return model.platform === "rumble" && model.kind === "event" &&
       (model.eventType === "stream_status" || /^Rumble stream (?:is live|is offline|started|ended)/.test(model.text));

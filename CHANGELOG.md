@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Ships the standard Bytebot combined chat (2026.10.31): only a reader scrolling up pauses auto-scroll, so an OBS Browser Source no longer gets stuck partway up after scene switches. Install only one copy.
+- The combined chat no longer shows Joystick follower-count updates ("Someone: Follower count updated") after each follow.
+
 ## [0.1.2-local.3] - 2026-10-22
 
 - Pre-release test build; no GitHub release. Plugin behavior is unchanged from 0.1.2-local.2.
