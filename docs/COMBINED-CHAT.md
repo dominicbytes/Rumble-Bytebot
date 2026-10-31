@@ -1,6 +1,6 @@
 # Combined Chat
 
-Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot ship the same `combined-chat` folder (version 2026.10.22) and the same **[Combined Chat] Controls** action.
+Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot ship the same `combined-chat` folder (version 2026.10.31) and the same **[Combined Chat] Controls** action.
 
 ## Install ONLY ONE combined chat
 

@@ -21,7 +21,7 @@
 
 ## Combined chat
 
-Install ONLY ONE combined chat. Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot ship the same `combined-chat` folder. Keep a single folder, replace its contents only when this package's chat version (2026.10.22) is newer, and never map a second copy. Keep one `StreamerBot.PlatformBridge.Core.dll`; every package ships the same file. See [COMBINED-CHAT.md](COMBINED-CHAT.md).
+Install ONLY ONE combined chat. Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot ship the same `combined-chat` folder. Keep a single folder, replace its contents only when this package's chat version (2026.10.31) is newer, and never map a second copy. Keep one `StreamerBot.PlatformBridge.Core.dll`; every package ships the same file. See [COMBINED-CHAT.md](COMBINED-CHAT.md).
 
 ## Startup
 

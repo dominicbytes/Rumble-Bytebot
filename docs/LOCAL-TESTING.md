@@ -1,6 +1,6 @@
-# Local Reliability Test - 0.1.2-local.3
+# Upgrade and Reliability Test - 0.1.2
 
-This is a pre-release test build with no GitHub release. Triggers, event arguments, the import bundle actions and the deduplication file format are unchanged. It also ships the standard Bytebot combined chat (version 2026.10.22), identical in the Rumble, Joystick and AltStream packages.
+Version 0.1.2 follows the 0.1.1 release. Triggers, event arguments and the deduplication file format are unchanged. It ships the standard Bytebot combined chat (version 2026.10.31), identical in the Rumble, Joystick and AltStream packages.
 
 ## Changes
 
@@ -14,8 +14,8 @@ This is a pre-release test build with no GitHub release. Triggers, event argumen
 1. Close Streamer.bot.
 2. Back up `Rumble.Bot.dll` and `StreamerBot.PlatformBridge.Core.dll` from Streamer.bot's `dlls` directory, and your `combined-chat` folder, for rollback.
 3. Copy `dlls/Rumble.Bot.dll` and `dlls/StreamerBot.PlatformBridge.Core.dll` into Streamer.bot's `dlls` directory. The core DLL is the same file in every Bytebot package; keep one copy.
-4. Install ONLY ONE combined chat. If your single existing `combined-chat` folder is older than 2026.10.22, replace its contents with this ZIP's `combined-chat` contents. Never map a second copy. See [COMBINED-CHAT.md](COMBINED-CHAT.md).
-5. Start Streamer.bot. Re-importing `Rumble.Bot.sb` is not required because the action code is unchanged. Reload each OBS dock and Browser Source.
+4. Install ONLY ONE combined chat. If your single existing `combined-chat` folder is older than 2026.10.31, replace its contents with this ZIP's `combined-chat` contents. Never map a second copy. See [COMBINED-CHAT.md](COMBINED-CHAT.md).
+5. Start Streamer.bot. When upgrading from 0.1.1, import `Rumble.Bot.sb`: it adds **[Combined Chat] Controls** and **[Rumble.Bot] Overlay Event** and updates the Host action. Re-importing is not required when upgrading from a 0.1.2-local build. Reload each OBS dock and Browser Source.
 6. Run `[Rumble.Bot] Start`, then `[Rumble.Bot] Status`. Confirm `Running=True` and `PollStatus=Succeeded`.
 
 Existing deduplication state is reused, so recent Rumble items are not replayed.

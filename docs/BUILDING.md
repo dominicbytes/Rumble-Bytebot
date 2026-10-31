@@ -14,4 +14,4 @@ The Streamer.bot directory is not redistributed. Supply it to the release script
 
 Use `-DotNetPath` when the SDK is installed outside `PATH` and outside the repository's ignored `.local/dotnet-sdk` directory.
 
-The script restores packages, runs Release tests, builds the import bundle, and creates `artifacts/Rumble-Bytebot-v0.1.2-local.3.zip`.
+The script restores packages, runs Release tests, builds the import bundle, and creates `artifacts/Rumble-Bytebot-v0.1.2.zip`.

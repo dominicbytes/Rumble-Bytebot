@@ -18,7 +18,7 @@ Rumble support is read-only. The documented API does not provide outbound chat, 
 
 ## Install
 
-Download `Rumble-Bytebot-v0.1.1.zip` from the repository's Releases page and follow [the installation guide](docs/INSTALLATION.md). Combined-chat setup is covered in [the overlay guide](docs/COMBINED-CHAT.md).
+Download `Rumble-Bytebot-v0.1.2.zip` from the repository's Releases page and follow [the installation guide](docs/INSTALLATION.md). Combined-chat setup is covered in [the overlay guide](docs/COMBINED-CHAT.md).
 
 ## Security
 
