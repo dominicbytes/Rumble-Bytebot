@@ -5,7 +5,7 @@ using System.Text.Json;
 
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 var dist = Path.Combine(root, "dist");
-var version = args.Length > 0 ? args[0] : "0.1.2-local.3";
+var version = args.Length > 0 ? args[0] : "0.1.2";
 
 BuildPackage(new Package(
     "Rumble.Bot",
