@@ -131,7 +131,7 @@ function createPage() {
     chat, status, sockets, document, elements,
     runTimer: () => timers.shift()?.(),
     runIntervals: () => intervals.forEach(callback => callback()),
-    fireWindow: name => (windowListeners[name] || []).forEach(callback => callback({}))
+    fireWindow: (name, event = {}) => (windowListeners[name] || []).forEach(callback => callback(event))
   };
 }
 
@@ -239,6 +239,12 @@ for (let index = 0; index < 100; index++) {
 }
 assert.equal(joystickPage.chat.children.length, 0, 'Viewer-count updates must not create chat rows');
 assert.equal(JSON.parse(storage.get(historyKey) || '[]').length, 0, 'Viewer-count updates must not fill history');
+// Joystick sends a follower-count update after each follow; v2 passes the type through as follower_count_updated.
+for (const type of ['follower_count_updated', 'FollowerCountUpdated', 'subscriber_count_updated']) {
+  joystickEvent('stream_event', { streamEventType: type, eventId: `count-${type}` });
+}
+assert.equal(joystickPage.chat.children.length, 0, 'Follower-count and other count updates must not create chat rows');
+assert.equal(JSON.parse(storage.get(historyKey) || '[]').length, 0, 'Count updates must not fill history');
 
 const joystickCases = [
   ['chat_message', { userName: 'Chatter', message: 'Someone: Viewer Count Updated', messageId: 'chat-viewer-count' }, 'Someone: Viewer Count Updated'],
@@ -269,7 +275,9 @@ const cachedCountNotice = {
   text: 'Someone: Viewer Count Updated', parts: [{ type: 'text', text: 'Someone: Viewer Count Updated' }],
   badges: [], createdAt: new Date().toISOString(), id: 'cached-viewer-count'
 };
-storage.set(historyKey, JSON.stringify([cachedCountNotice, ...savedJoystickRows]));
+const cachedFollowerCountNotice = { ...cachedCountNotice, text: 'Someone: Follower count updated',
+  parts: [{ type: 'text', text: 'Someone: Follower count updated' }], id: 'cached-follower-count' };
+storage.set(historyKey, JSON.stringify([cachedCountNotice, cachedFollowerCountNotice, ...savedJoystickRows]));
 const joystickRestoredPage = createPage();
 assert.equal(joystickRestoredPage.chat.children.length, joystickCases.length, 'Cached viewer-count notices must not reappear');
 joystickRestoredPage.sockets[0].open();
@@ -278,7 +286,7 @@ joystickRestoredPage.sockets[0].message({
   data: { eventName: 'bridge.joystick.followed', arguments: { userName: 'NewFollower', eventId: 'new-follow' } }
 });
 assert.equal(JSON.parse(storage.get(historyKey)).length, joystickCases.length + 1, 'Saved history must exclude cached count notices');
-console.log('Joystick viewer-count filtering regression tests passed.');
+console.log('Joystick count-update filtering regression tests passed.');
 
 storage.clear();
 storage.set('bytebot-platforms-v1:ws://127.0.0.1:8080/', JSON.stringify(['joystick']));
@@ -396,6 +404,23 @@ assert.equal(emoteBody.children.map(child => child.textContent).join(''), 'Hi Ka
 
 featurePage.document.scrollingElement = { scrollHeight: 1000, scrollTop: 0, clientHeight: 300 };
 const jump = featurePage.elements.get('jump-latest');
+// OBS sources cannot scroll: content that grew while a scene was hidden must not pause following.
+twitchChat('stuck-1', 'u9', 'reader', 'after a scene switch');
+assert(featurePage.chat.children.at(-1).scrollCount > 0, 'Without reader input, new rows stay pinned to the bottom');
+assert.equal(jump.hidden, true, 'No new-messages button without reader input');
+featurePage.fireWindow('scroll');
+twitchChat('stuck-2', 'u9', 'reader', 'after a layout scroll');
+assert(featurePage.chat.children.at(-1).scrollCount > 0, 'A scroll the reader did not cause does not pause following');
+const pinnedRow = featurePage.chat.children.at(-1);
+const pinnedScrolls = pinnedRow.scrollCount;
+featurePage.fireWindow('resize');
+assert(pinnedRow.scrollCount > pinnedScrolls, 'A resize keeps the newest row in view');
+featurePage.fireWindow('keydown', { key: 'a' });
+featurePage.fireWindow('scroll');
+twitchChat('stuck-3', 'u9', 'reader', 'after typing');
+assert(featurePage.chat.children.at(-1).scrollCount > 0, 'Ordinary keys do not pause following');
+featurePage.fireWindow('wheel');
+featurePage.fireWindow('scroll');
 twitchChat('scroll-1', 'u9', 'reader', 'while scrolled up');
 const pausedRow = featurePage.chat.children.at(-1);
 assert.equal(pausedRow.scrollCount, 0, 'Reading older chat is not interrupted');
@@ -407,7 +432,11 @@ jump.listeners.click.forEach(callback => callback({}));
 assert.equal(jump.hidden, true);
 assert(featurePage.chat.children.at(-1).scrollCount > 0, 'Jump scrolls to the newest row');
 featurePage.document.scrollingElement.scrollTop = 0;
+featurePage.fireWindow('keydown', { key: 'PageUp' });
+featurePage.fireWindow('scroll');
 twitchChat('scroll-3', 'u9', 'reader', 'third');
+assert.equal(featurePage.chat.children.at(-1).scrollCount, 0, 'Paging up pauses following');
+assert.equal(jump.hidden, false);
 featurePage.document.scrollingElement.scrollTop = 700;
 featurePage.fireWindow('scroll');
 assert.equal(jump.hidden, true, 'Scrolling back to the bottom resumes following');

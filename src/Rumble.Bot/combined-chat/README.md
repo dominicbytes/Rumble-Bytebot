@@ -1,4 +1,4 @@
-# Bytebot combined chat — version 2026.10.22
+# Bytebot combined chat — version 2026.10.31
 
 This `combined-chat` folder is identical in Rumble-Bytebot, Joysticktv-Bytebot and Altstream-Bytebot. It shows Twitch, YouTube, Kick, Rumble, AltStream and (when enabled) Joystick.TV chat in one feed.
 
@@ -30,9 +30,9 @@ Use `?ws=ws://127.0.0.1:PORT/` on every display if your WebSocket port differs. 
 - Paid events (rants, cheers, Super Chats, Kicks, tips, wheel spins) are highlighted.
 - Twitch deleted messages, chat clears, bans and timeouts remove the affected Twitch rows from the display and its saved history. YouTube and Kick removal is not yet supported because Streamer.bot does not document those payloads.
 - AltStream message deletes and chat clears remove AltStream rows. AltStream redemptions, shoutouts, outgoing raids and incoming raids appear as event rows, and highlighted messages appear as accented chat rows. AltStream follows are streamer-only on AltStream, so they fire triggers but are not shown.
-- Scrolling up pauses auto-scroll. A **new messages** button appears; click it or scroll to the bottom to resume.
+- Scrolling up with the mouse wheel, touch, scroll keys or the scrollbar pauses auto-scroll. A **new messages** button appears; click it or scroll to the bottom to resume. Nothing else pauses it, so an OBS Browser Source that cannot be scrolled always stays on the newest message, including after scene switches.
 - Each display keeps up to 200 rows for seven days so it can redraw immediately. It cannot recover messages missed while it was offline.
-- Rumble stream-status notices and Joystick presence/viewer-count notices are never shown.
+- Rumble stream-status notices and Joystick presence, viewer-count and follower-count notices are never shown.
 
 ## Overlay Event action
 
